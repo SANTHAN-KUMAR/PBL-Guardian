@@ -1,4 +1,4 @@
-# PBL Guardian — Automated Student Project Evaluation
+# 🤖 PBL Guardian — Automated Student Project Evaluation
 
 An automated, bias-free evaluation system for Project-Based Learning (PBL) that uses GitHub Actions to continuously assess student projects on every push.
 
@@ -8,11 +8,11 @@ Every time a student pushes code, PBL Guardian automatically evaluates their com
 
 | Check | What's Evaluated |
 |---|---|
-| **Timing** | Commit vs. milestone deadlines + class day detection |
-| **Code Quality** | Pylint score (0-10) + top issues |
-| **Proofs** | Screenshots & progress logs in `proofs/` |
-| **Contribution** | Gini coefficient for team equity |
-| **Plagiarism** | 5-layer defense (corpus, peer, GitHub search, AI detection, commit forensics) |
+| ⏰ **Timing** | Commit vs. milestone deadlines + class day detection |
+| 📊 **Code Quality** | Pylint score (0-10) + top issues |
+| 📸 **Proofs** | Screenshots & progress logs in `proofs/` |
+| 👥 **Contribution** | Gini coefficient for team equity |
+| 🔍 **Plagiarism** | 5-layer defense (corpus, peer, GitHub search, AI detection, commit forensics) |
 
 ### 5-Layer Plagiarism Defense
 
@@ -151,4 +151,4 @@ When a student pushes code, they'll see a comment like this on their commit:
 
 ## License
 
-Not licensed yet
+MIT — Built for education, use freely.
