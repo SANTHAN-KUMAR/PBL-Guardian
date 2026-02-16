@@ -1,0 +1,104 @@
+# =============================================================================
+# PBL Guardian — Weekly Peer Plagiarism Check (JPlag)
+# =============================================================================
+# This workflow runs on YOUR account (not student repos).
+# It clones all student repos, runs JPlag across them, and uploads a report.
+#
+# SETUP:
+# 1. Create a repository secret STUDENT_REPOS with a JSON array of repo names
+#    Example: ["org/team1-project", "org/team2-project", ...]
+# 2. Ensure your GITHUB_TOKEN has read access to all student repos
+# =============================================================================
+
+name: "🔍 Weekly Peer Plagiarism Check"
+
+on:
+  # Run every Monday at 6:00 AM IST (00:30 UTC)
+  schedule:
+    - cron: "30 0 * * 1"
+
+  # Also allow manual trigger
+  workflow_dispatch:
+    inputs:
+      student_repos:
+        description: "JSON array of student repo names (e.g., [\"org/repo1\", \"org/repo2\"])"
+        required: false
+        type: string
+
+jobs:
+  peer-check:
+    name: "🔍 JPlag Peer Comparison"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "📥 Checkout PBL Guardian"
+        uses: actions/checkout@v4
+
+      - name: "☕ Set up Java (for JPlag)"
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: "📥 Download JPlag"
+        run: |
+          mkdir -p tools
+          curl -L -o tools/jplag.jar \
+            "https://github.com/jplag/JPlag/releases/download/v5.1.0/jplag-5.1.0-jar-with-dependencies.jar"
+
+      - name: "📥 Clone all student repos"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STUDENT_REPOS: ${{ inputs.student_repos || secrets.STUDENT_REPOS || '[]' }}
+        run: |
+          mkdir -p student-repos
+          echo "$STUDENT_REPOS" | python3 -c "
+          import json, sys, subprocess
+          repos = json.load(sys.stdin)
+          for repo in repos:
+              name = repo.split('/')[-1]
+              print(f'Cloning {repo}...')
+              subprocess.run([
+                  'git', 'clone', '--depth', '1',
+                  f'https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/{repo}.git',
+                  f'student-repos/{name}'
+              ], capture_output=True)
+          print(f'Cloned {len(repos)} repos')
+          "
+
+      - name: "🔍 Run JPlag peer comparison"
+        run: |
+          mkdir -p results
+
+          # Count repos
+          REPO_COUNT=$(ls -d student-repos/*/ 2>/dev/null | wc -l)
+          echo "Found $REPO_COUNT student repos"
+
+          if [ "$REPO_COUNT" -lt 2 ]; then
+            echo "Need at least 2 repos for comparison. Skipping."
+            echo "# JPlag Report\n\nNot enough repos to compare." > results/report.md
+            exit 0
+          fi
+
+          # Run JPlag
+          java -jar tools/jplag.jar \
+            -l python3 \
+            -r results/jplag-output \
+            -bc ".github,.pbl,scripts,proofs,references" \
+            student-repos/ || echo "JPlag completed with warnings"
+
+          # Generate summary
+          echo "# 🔍 Weekly Peer Plagiarism Report" > results/report.md
+          echo "" >> results/report.md
+          echo "**Date:** $(date -u +%Y-%m-%d)" >> results/report.md
+          echo "**Repos compared:** $REPO_COUNT" >> results/report.md
+          echo "" >> results/report.md
+          echo "Check the jplag-output artifact for the full interactive report." >> results/report.md
+
+      - name: "📤 Upload JPlag results"
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: "jplag-peer-report-${{ github.run_number }}"
+          path: results/
+          retention-days: 90

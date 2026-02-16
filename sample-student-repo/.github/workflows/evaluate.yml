@@ -1,0 +1,26 @@
+# =============================================================================
+# PBL Guardian — Student Evaluation Trigger
+# =============================================================================
+# This is the ONLY file students need in their repo's .github/workflows/
+# It calls the reusable evaluation workflow from the central pbl-guardian repo.
+#
+# SETUP:
+# 1. Copy this file to your repo's .github/workflows/evaluate.yml
+# 2. Copy .pbl/config.json to your repo and fill in your team details
+# 3. Replace YOUR-GITHUB-USERNAME below with the actual username
+# =============================================================================
+
+name: "🤖 PBL Evaluation"
+
+on:
+  push:
+    branches: ["*"]
+
+jobs:
+  evaluate:
+    # ⬇️ CHANGE THIS to your instructor's GitHub username
+    uses: YOUR-GITHUB-USERNAME/pbl-guardian/.github/workflows/evaluation.yml@main
+    with:
+      source_dir: "src"
+      config_path: ".pbl/config.json"
+    secrets: inherit

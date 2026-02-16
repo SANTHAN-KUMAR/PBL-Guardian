@@ -1,0 +1,36 @@
+{
+    "team_id": "Team-1",
+    "team_name": "ML Mavericks",
+    "class_days": [
+        "Monday",
+        "Saturday"
+    ],
+    "timezone": "Asia/Kolkata",
+    "grace_period_hours": 2,
+    "milestones": [
+        {
+            "phase": "Phase 1 - Setup & Planning",
+            "deadline": "2026-03-01"
+        },
+        {
+            "phase": "Phase 2 - Core Development",
+            "deadline": "2026-03-15"
+        },
+        {
+            "phase": "Phase 3 - Testing & Integration",
+            "deadline": "2026-03-29"
+        },
+        {
+            "phase": "Phase 4 - Final Submission",
+            "deadline": "2026-04-12"
+        }
+    ],
+    "language": "python",
+    "proof_directory": "proofs/",
+    "min_quality_score": 7.0,
+    "plagiarism_threshold": 30,
+    "reference_repos": [
+        "YOUR-USERNAME/past-project-1",
+        "YOUR-USERNAME/past-project-2"
+    ]
+}
