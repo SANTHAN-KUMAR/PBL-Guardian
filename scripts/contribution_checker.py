@@ -80,11 +80,7 @@ def _calculate_gini(values: list) -> float:
         return 0.0
 
     sorted_values = sorted(values)
-    cumulative = 0
     total = sum(sorted_values)
-
-    for i, v in enumerate(sorted_values):
-        cumulative += v
 
     # Gini formula
     numerator = 0

@@ -5,6 +5,7 @@ Validates that students submitted screenshots or progress logs with their commit
 
 import json
 import os
+import re
 import subprocess
 
 
@@ -119,7 +120,7 @@ def check_proofs(proof_dir: str = "proofs", commit_sha: str = "HEAD") -> dict:
         "code_changed": code_changed,
         "status": status,
         "status_emoji": status_emoji,
-        "detail": status.lstrip("✅ ❌ ⚠️ "),
+        "detail": re.sub(r"^[✅❌⚠️🚨\s]+", "", status),
     }
 
 

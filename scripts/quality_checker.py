@@ -51,44 +51,13 @@ def check_quality(source_dir: str, language: str = "python", min_score: float = 
             "status_emoji": "⚠️",
         }
 
-    # Run Pylint with JSON output
+    # Run Pylint once — get both JSON issues and score in a single invocation
     try:
         result = subprocess.run(
             [
                 sys.executable, "-m", "pylint",
-                "--output-format=json",
+                "--output-format=json2",
                 "--disable=C0114,C0115,C0116",  # Disable missing docstring warnings
-                "--max-line-length=120",
-                *py_files,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-
-        # Pylint returns non-zero even for warnings, so we parse regardless
-        pylint_output = result.stdout.strip()
-        if pylint_output:
-            issues_raw = json.loads(pylint_output)
-        else:
-            issues_raw = []
-
-    except (subprocess.TimeoutExpired, FileNotFoundError, json.JSONDecodeError) as e:
-        return {
-            "passed": False,
-            "score": 0,
-            "issues": [{"message": f"Pylint failed to run: {str(e)}"}],
-            "detail": "Pylint execution error",
-            "status": "❌ Error",
-            "status_emoji": "❌",
-        }
-
-    # Also run Pylint for the score
-    try:
-        score_result = subprocess.run(
-            [
-                sys.executable, "-m", "pylint",
-                "--disable=C0114,C0115,C0116",
                 "--max-line-length=120",
                 "--score=y",
                 *py_files,
@@ -97,17 +66,45 @@ def check_quality(source_dir: str, language: str = "python", min_score: float = 
             text=True,
             timeout=120,
         )
-        # Extract score from output like "Your code has been rated at 8.50/10"
+
+        # Pylint returns non-zero even for warnings, so we parse regardless
+        # json2 format outputs a JSON object with 'messages' and 'statistics' keys
+        pylint_output = result.stdout.strip()
+        issues_raw = []
         score = 0.0
-        for line in score_result.stdout.split("\n"):
-            if "rated at" in line:
+
+        if pylint_output:
+            try:
+                parsed = json.loads(pylint_output)
+                issues_raw = parsed.get("messages", [])
+                # Extract score from statistics
+                score = parsed.get("statistics", {}).get("score", 0.0)
+            except (json.JSONDecodeError, AttributeError):
+                # Fallback: try legacy json format
                 try:
-                    score = float(line.split("rated at")[1].split("/")[0].strip())
-                except (ValueError, IndexError):
-                    score = 0.0
-                break
-    except Exception:
-        score = 0.0
+                    issues_raw = json.loads(pylint_output)
+                except json.JSONDecodeError:
+                    issues_raw = []
+
+        # If score wasn't in JSON, try parsing stderr for the rating line
+        if score == 0.0:
+            for line in (result.stdout + result.stderr).split("\n"):
+                if "rated at" in line:
+                    try:
+                        score = float(line.split("rated at")[1].split("/")[0].strip())
+                    except (ValueError, IndexError):
+                        score = 0.0
+                    break
+
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        return {
+            "passed": False,
+            "score": 0,
+            "issues": [{"message": f"Pylint failed to run: {str(e)}"}],
+            "detail": "Pylint execution error",
+            "status": "❌ Error",
+            "status_emoji": "❌",
+        }
 
     # Extract top issues (limit to 5)
     top_issues = []

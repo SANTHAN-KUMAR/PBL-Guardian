@@ -241,14 +241,16 @@ def layer3_github_search(source_dir: str, github_token: str = None) -> dict:
             continue
 
     total_searched = min(len(functions), 3)
-    passed = matches_found == 0
+    # Only flag if majority of searched functions have matches (reduces false positives)
+    passed = matches_found < max(total_searched // 2 + 1, 2)
 
     return {
         "matches_found": matches_found,
         "searched_functions": total_searched,
         "flagged": flagged,
         "passed": passed,
-        "detail": f"{matches_found} matches found across {total_searched} searched functions",
+        "detail": f"{matches_found}/{total_searched} functions matched on GitHub"
+               + (" — likely copied" if not passed else ""),
     }
 
 
@@ -456,9 +458,11 @@ def layer5_commit_patterns(max_dump_lines: int = 200) -> dict:
     """
     try:
         # Get commit history with stats
+        # Use ASCII Unit Separator (\x1f) instead of pipe — commit messages can contain pipes
+        SEP = "\x1f"
         result = subprocess.run(
             ["git", "log", "--all", "--no-merges",
-             "--format=%H|%aN|%aI|%s", "--numstat"],
+             f"--format=%H{SEP}%aN{SEP}%aI{SEP}%s", "--numstat"],
             capture_output=True,
             text=True,
             timeout=30,
@@ -474,15 +478,16 @@ def layer5_commit_patterns(max_dump_lines: int = 200) -> dict:
 
     commits = []
     current_commit = None
+    SEP = "\x1f"
 
     for line in result.stdout.strip().split("\n"):
         line = line.strip()
         if not line:
             continue
 
-        if "|" in line and line.count("|") >= 3:
-            # New commit header
-            parts = line.split("|", 3)
+        if SEP in line:
+            # New commit header (unit separator is never in user content)
+            parts = line.split(SEP, 3)
             if len(parts) == 4:
                 if current_commit:
                     commits.append(current_commit)

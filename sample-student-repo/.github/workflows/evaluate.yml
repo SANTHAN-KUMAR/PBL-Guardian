@@ -71,8 +71,8 @@ jobs:
           except: pass
           " | while IFS= read -r repo; do
               if [ -n "$repo" ]; then
-                echo \"Cloning reference: \$repo\"
-                git clone --depth 1 \"https://github.com/\${repo}.git\" \"references/\$(basename \$repo)\" 2>/dev/null || true
+                echo "Cloning reference: $repo"
+                git clone --depth 1 "https://github.com/${repo}.git" "references/$(basename $repo)" 2>/dev/null || true
               fi
             done
           fi
