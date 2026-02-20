@@ -1,0 +1,132 @@
+# =============================================================================
+# PBL Guardian — Student Evaluation (Self-Updating)
+# =============================================================================
+# This workflow downloads the LATEST evaluation scripts from PBL-Guardian
+# on every push. You NEVER need to update this file — fixes to the central
+# repo automatically apply next time a student pushes.
+#
+# SETUP: Replace SANTHAN-KUMAR below with your GitHub username.
+# =============================================================================
+
+name: "🤖 PBL Evaluation"
+
+on:
+  push:
+    branches: ["*"]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+env:
+  # ⬇️ CHANGE THIS to your GitHub username and repo name
+  PBL_GUARDIAN_REPO: "SANTHAN-KUMAR/PBL-Guardian"
+  PBL_GUARDIAN_BRANCH: "main"
+
+jobs:
+  evaluate:
+    name: "📋 Evaluate Commit"
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout student repo (full history for git analysis)
+      - name: "📥 Checkout student repo"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2. Download latest PBL Guardian scripts from central repo
+      - name: "⬇️ Download PBL Guardian (latest)"
+        run: |
+          echo "📦 Downloading latest PBL Guardian from ${{ env.PBL_GUARDIAN_REPO }}..."
+          mkdir -p .pbl-guardian
+          curl -sL "https://github.com/${{ env.PBL_GUARDIAN_REPO }}/archive/refs/heads/${{ env.PBL_GUARDIAN_BRANCH }}.tar.gz" \
+            | tar xz --strip-components=1 -C .pbl-guardian
+          echo "✅ Downloaded scripts:"
+          ls -la .pbl-guardian/scripts/
+
+      # 3. Set up Python
+      - name: "🐍 Set up Python 3.11"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 4. Install dependencies
+      - name: "📦 Install dependencies"
+        run: pip install -r .pbl-guardian/scripts/requirements.txt
+
+      # 5. Clone reference repos for L1 plagiarism
+      - name: "📚 Prepare reference corpus"
+        run: |
+          mkdir -p references
+          if [ -f ".pbl/config.json" ]; then
+            python3 -c "
+          import json
+          try:
+              with open('.pbl/config.json') as f:
+                  config = json.load(f)
+              for repo in config.get('reference_repos', []):
+                  print(repo)
+          except: pass
+          " | while IFS= read -r repo; do
+              if [ -n "$repo" ]; then
+                echo "Cloning reference: $repo"
+                git clone --depth 1 "https://github.com/${repo}.git" "references/$(basename $repo)" 2>/dev/null || true
+              fi
+            done
+          fi
+
+      # 6. Get commit metadata
+      - name: "📝 Get commit metadata"
+        id: meta
+        run: |
+          echo "timestamp=$(git show -s --format=%aI ${{ github.sha }})" >> $GITHUB_OUTPUT
+          echo "author=${{ github.actor }}" >> $GITHUB_OUTPUT
+
+      # 7. Run evaluation
+      - name: "🔍 Run PBL Guardian evaluation"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPORT_FILE: evaluation_report.md
+        run: |
+          python3 .pbl-guardian/scripts/evaluate.py \
+            --config ".pbl/config.json" \
+            --sha "${{ github.sha }}" \
+            --timestamp "${{ steps.meta.outputs.timestamp }}" \
+            --author "${{ steps.meta.outputs.author }}" \
+            --source-dir "src" \
+            --reference-dir "references" \
+            --output "evaluation_results.json" || true
+
+      # 8. Post bot comment on commit
+      - name: "💬 Post evaluation comment"
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            let report = '';
+            try {
+              report = fs.readFileSync('evaluation_report.md', 'utf8');
+            } catch (e) {
+              report = '## 🤖 PBL Guardian\n\n⚠️ Report generation failed. Check Actions log.';
+            }
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body: report
+            });
+            console.log('✅ Comment posted on commit ' + context.sha.substring(0, 7));
+
+      # 9. Upload artifacts
+      - name: "📤 Upload evaluation report"
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: "pbl-evaluation-${{ github.sha }}"
+          path: |
+            evaluation_report.md
+            evaluation_results.json
+          retention-days: 90
